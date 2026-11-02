@@ -10,7 +10,23 @@ struct IncomeDetails: View {
     var body: some View {
         let snapshot = store.snapshot
         let settings = store.displaySettings
-        VStack(alignment: .leading, spacing: 18) {
+        ScrollViewReader { proxy in
+            ScrollView(.vertical) {
+                content(snapshot: snapshot, settings: settings)
+                    .id("details-top")
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .onChange(of: store.detailsPresentationID) { _, _ in
+                proxy.scrollTo("details-top", anchor: .top)
+            }
+        }
+        .frame(width: 308, height: store.detailsHeight)
+        .tint(.primary)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("今日收入详情")
+    }
+    private func content(snapshot: IncomeSnapshot, settings: IncomeSettings) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text(store.millionaireMode ? "百万年薪体验" : "今日收入").font(.system(size: 13, weight: .semibold))
                 Spacer()
@@ -63,10 +79,7 @@ struct IncomeDetails: View {
             }.font(.system(size: 11))
         }
         .padding(22)
-        .frame(width: 308)
-        .tint(.primary)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("今日收入详情")
+        .frame(width: 308, alignment: .topLeading)
     }
     private func detail(_ label: String, _ value: String) -> some View {
         HStack {

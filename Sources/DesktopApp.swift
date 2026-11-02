@@ -7,6 +7,8 @@ final class IncomeStore: ObservableObject {
     @Published var settings: IncomeSettings
     @Published var now = Date()
     @Published var millionaireMode = false
+    @Published var detailsHeight: CGFloat = 440
+    @Published var detailsPresentationID = 0
     @Published var locked: Bool {
         didSet { UserDefaults.standard.set(locked, forKey: "positionLocked") }
     }
@@ -121,13 +123,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         popover.behavior = .transient
         popover.animates = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        popover.contentViewController = NSHostingController(rootView: IncomeDetails(
+        let detailsController = NSHostingController(rootView: IncomeDetails(
             store: store,
             edit: { [weak self] in self?.showSettings() },
             loginEnabled: { SMAppService.mainApp.status == .enabled },
             toggleLogin: { [weak self] in self?.toggleLogin() },
             quit: { NSApp.terminate(nil) }
         ))
+        // A fixed viewport prevents SwiftUI content growth from moving the popover above the menu bar.
+        detailsController.sizingOptions = []
+        popover.contentViewController = detailsController
+        popover.contentSize = NSSize(width: 308, height: store.detailsHeight)
         store.$now.combineLatest(store.$settings, store.$millionaireMode)
             .receive(on: RunLoop.main)
             .sink { [weak self] _, _, _ in
@@ -183,10 +189,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if popover.isShown { popover.performClose(nil) }
         else {
             store.now = Date()
+            let screen = button.window?.screen ?? NSScreen.main
+            let anchor = button.window?.convertToScreen(button.convert(button.bounds, to: nil))
+            let available = screen.map { min($0.visibleFrame.maxY, anchor?.minY ?? $0.visibleFrame.maxY) - $0.visibleFrame.minY } ?? 500
+            store.detailsHeight = min(440, max(160, available - 40))
+            store.detailsPresentationID += 1
+            popover.contentSize = NSSize(width: 308, height: store.detailsHeight)
+            popover.contentViewController?.view.frame.size = popover.contentSize
             NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            positionDetailsBelowMenuBar()
+            DispatchQueue.main.async { [weak self] in self?.positionDetailsBelowMenuBar() }
             popover.contentViewController?.view.window?.makeKey()
         }
+    }
+
+    private func positionDetailsBelowMenuBar() {
+        guard popover.isShown, let button = statusItem.button,
+              let statusWindow = button.window,
+              let screen = statusWindow.screen ?? NSScreen.main,
+              let window = popover.contentViewController?.view.window else { return }
+        let bounds = screen.visibleFrame.insetBy(dx: 8, dy: 8)
+        let anchor = statusWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        let frame = window.frame
+        let x = max(bounds.minX, min(frame.minX, bounds.maxX - frame.width))
+        let top = min(anchor.minY - 2, bounds.maxY)
+        let y = max(bounds.minY, min(top - frame.height, bounds.maxY - frame.height))
+        window.setFrameOrigin(NSPoint(x: x, y: y))
     }
 
     func windowWillClose(_ notification: Notification) {
