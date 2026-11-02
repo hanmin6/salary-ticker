@@ -6,6 +6,7 @@ import Combine
 final class IncomeStore: ObservableObject {
     @Published var settings: IncomeSettings
     @Published var now = Date()
+    @Published var millionaireMode = false
     @Published var locked: Bool {
         didSet { UserDefaults.standard.set(locked, forKey: "positionLocked") }
     }
@@ -21,7 +22,9 @@ final class IncomeStore: ObservableObject {
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
     }
-    var snapshot: IncomeSnapshot { IncomeMath.snapshot(settings, now: now) }
+    var displaySettings: IncomeSettings { millionaireMode ? settings.millionaireExperience : settings }
+    var snapshot: IncomeSnapshot { IncomeMath.snapshot(displaySettings, now: now) }
+    func toggleMillionaireMode() { millionaireMode.toggle(); now = Date() }
     func save(_ settings: IncomeSettings) throws {
         let valid = try settings.validated()
         let data = try JSONEncoder().encode(valid)
@@ -125,9 +128,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             toggleLogin: { [weak self] in self?.toggleLogin() },
             quit: { NSApp.terminate(nil) }
         ))
-        store.$now.combineLatest(store.$settings)
+        store.$now.combineLatest(store.$settings, store.$millionaireMode)
             .receive(on: RunLoop.main)
-            .sink { [weak self] _, _ in
+            .sink { [weak self] _, _, _ in
                 // Published values become current after the publisher sends them.
                 DispatchQueue.main.async { self?.updateStatusAmount() }
             }.store(in: &subscriptions)
@@ -147,17 +150,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func updateStatusAmount() {
-        let amount = store.settings.money(store.snapshot.earned, digits: 3)
+        let amount = store.displaySettings.money(store.snapshot.earned, digits: 3)
         lastAmount = amount
-        let width = max(StatusAmountRenderer.width(for: amount), StatusAmountRenderer.width(for: store.settings.money(store.settings.dailySalary, digits: 3)))
+        let width = max(StatusAmountRenderer.width(for: amount), StatusAmountRenderer.width(for: store.displaySettings.money(store.displaySettings.dailySalary, digits: 3)))
         statusItem.length = width + 4
         let animate = lastCurrency == store.settings.currency && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         lastCurrency = store.settings.currency
         let snapshot = store.snapshot
-        let earning = store.settings.monthlySalary > 0 && (snapshot.status == .working || (snapshot.status == .lunch && store.settings.lunchPaid))
+        let earning = store.displaySettings.monthlySalary > 0 && (snapshot.status == .working || (snapshot.status == .lunch && store.settings.lunchPaid))
         amountAnimator?.show(amount, width: width, animated: animate, earning: earning)
         statusItem.button?.setAccessibilityLabel("今日收入 \(amount)，点击查看详情")
-        statusItem.button?.toolTip = "今日收入 \(amount) · \(store.snapshot.statusLabel)"
+        statusItem.button?.toolTip = "\(store.millionaireMode ? "百万年薪体验" : "今日收入") \(amount) · \(store.snapshot.statusLabel)"
     }
 
     @objc func statusClicked() {

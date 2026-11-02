@@ -9,10 +9,10 @@ struct IncomeDetails: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         let snapshot = store.snapshot
-        let settings = store.settings
+        let settings = store.displaySettings
         VStack(alignment: .leading, spacing: 18) {
             HStack {
-                Text("今日收入").font(.system(size: 13, weight: .semibold))
+                Text(store.millionaireMode ? "百万年薪体验" : "今日收入").font(.system(size: 13, weight: .semibold))
                 Spacer()
                 Text(snapshot.statusLabel).font(.system(size: 11)).foregroundStyle(.secondary)
             }
@@ -40,9 +40,14 @@ struct IncomeDetails: View {
             VStack(spacing: 11) {
                 detail("工作时间", settings.hoursLabel)
                 if settings.lunchEnabled { detail("午休", settings.lunchLabel) }
-                detail("月薪", settings.money(settings.monthlySalary))
+                detail(store.millionaireMode ? "体验月薪" : "月薪", settings.money(settings.monthlySalary))
                 detail("日薪估算", settings.money(settings.dailySalary))
                 detail("每小时", settings.money(snapshot.perHour))
+            }
+            MillionaireButton(active: store.millionaireMode, action: store.toggleMillionaireMode)
+            if store.millionaireMode {
+                Text("体验金额 · 年薪 100 万 ÷ 12，退出后恢复真实工资")
+                    .font(.system(size: 9)).foregroundStyle(.secondary)
             }
             Divider()
             HStack {
@@ -69,5 +74,43 @@ struct IncomeDetails: View {
             Spacer()
             Text(value).monospacedDigit()
         }.font(.system(size: 11))
+    }
+}
+
+struct MillionaireButton: View {
+    let active: Bool
+    let action: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body: some View {
+        Button(action: action) {
+            TimelineView(.animation(minimumInterval: 1.0 / 24, paused: reduceMotion)) { context in
+                let phase = reduceMotion ? 0.5 : context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3.5) / 3.5
+                HStack(spacing: 7) {
+                    Image(systemName: active ? "arrow.uturn.backward" : "sparkles")
+                    Text(active ? "退出百万年薪体验" : "一键体验年薪百万")
+                        .fontWeight(.semibold)
+                }
+                .font(.system(size: 12))
+                .foregroundStyle(Color(red: 0.34, green: 0.22, blue: 0.06))
+                .frame(maxWidth: .infinity).padding(.vertical, 11)
+                .background {
+                    Capsule().fill(LinearGradient(colors: [Color(red: 0.85, green: 0.65, blue: 0.29), Color(red: 1, green: 0.91, blue: 0.61), Color(red: 0.91, green: 0.73, blue: 0.37)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                }
+                .overlay {
+                    GeometryReader { geometry in
+                        Rectangle()
+                            .fill(LinearGradient(colors: [.clear, .white.opacity(0.65), .clear], startPoint: .leading, endPoint: .trailing))
+                            .frame(width: 45).rotationEffect(.degrees(22))
+                            .offset(x: (geometry.size.width + 110) * phase - 65)
+                    }.allowsHitTesting(false)
+                }
+                .clipShape(Capsule())
+                .overlay(Capsule().strokeBorder(.white.opacity(0.45), lineWidth: 0.7))
+                .shadow(color: Color(red: 0.85, green: 0.63, blue: 0.2).opacity(0.22), radius: 6, y: 2)
+                .contentShape(Capsule())
+            }
+        }
+        .buttonStyle(.plain)
+        .help(active ? "恢复真实工资，原设置不变" : "临时按年薪一百万体验，工作与午休时间不变")
     }
 }

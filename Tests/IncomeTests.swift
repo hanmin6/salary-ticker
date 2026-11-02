@@ -109,6 +109,16 @@ struct IncomeTests {
         let legacyJSON = "{\"currency\":\"CNY\",\"monthlySalary\":6000,\"workStart\":600,\"workEnd\":1080,\"monthlyWorkdays\":21.75,\"workdays\":[1,2,3,4,5]}"
         let legacy = try JSONDecoder().decode(IncomeSettings.self, from: Data(legacyJSON.utf8)).validated()
         check("old settings load with lunch disabled", !legacy.lunchEnabled && legacy.monthlySalary == 6000 && legacy.workStart == 600)
+        let real = settings
+        let experience = settings.millionaireExperience
+        check("millionaire annual rate is exactly one million", abs(experience.monthlySalary * 12 - 1_000_000) < 1e-7)
+        check("experience preserves schedule", experience.workStart == real.workStart && experience.workEnd == real.workEnd && experience.workdays == real.workdays)
+        check("experience preserves lunch and paid days", experience.lunchStart == real.lunchStart && experience.lunchEnd == real.lunchEnd && experience.lunchPaid == real.lunchPaid && experience.lunchEnabled == real.lunchEnabled && experience.monthlyWorkdays == real.monthlyWorkdays)
+        check("experience does not mutate real salary", settings == real)
+        let realSnapshot = IncomeMath.snapshot(real, now: date(30, 23), calendar: calendar)
+        let demoSnapshot = IncomeMath.snapshot(experience, now: date(30, 23), calendar: calendar)
+        check("experience preserves work progress and status", realSnapshot.progress == demoSnapshot.progress && realSnapshot.status == demoSnapshot.status)
+        check("experience scales earned amount only", abs(demoSnapshot.earned - realSnapshot.earned * experience.monthlySalary / real.monthlySalary) < 1e-7)
         let encoded = try JSONEncoder().encode(settings)
         let decoded = try JSONDecoder().decode(IncomeSettings.self, from: encoded)
         check("settings survive JSON round trip", decoded == settings)

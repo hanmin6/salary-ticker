@@ -68,7 +68,7 @@ struct IncomeCard: View {
     let edit: (EditField) -> Void
     let toggleLock: () -> Void
     var body: some View {
-        IncomeDisplay(settings: store.settings, snapshot: store.snapshot, now: store.now, locked: store.locked, edit: { edit(.currency) })
+        IncomeDisplay(settings: store.displaySettings, snapshot: store.snapshot, now: store.now, locked: store.locked, edit: { edit(.currency) })
             .contextMenu {
                 Button("修改币种…") { edit(.currency) }
                 Button("修改工资…") { edit(.salary) }

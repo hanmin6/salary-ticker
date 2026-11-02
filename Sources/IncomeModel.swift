@@ -53,6 +53,11 @@ struct IncomeSettings: Codable, Equatable {
         return copy
     }
 
+    var millionaireExperience: IncomeSettings {
+        var experience = self
+        experience.monthlySalary = 1_000_000.0 / 12
+        return experience
+    }
     var dailySalary: Double { monthlySalary / monthlyWorkdays }
     var overnight: Bool { workEnd < workStart }
     static func clock(_ minutes: Int) -> String { String(format: "%02d:%02d", minutes / 60, minutes % 60) }
